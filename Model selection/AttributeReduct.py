@@ -1,16 +1,7 @@
 import numpy as np
 import pandas as pd
-from pprint import pprint
-from collections import Counter
 from base import Transformer
 from GeneticAlgorithm import Evolution
-
-df = pd.read_csv("/Users/apple/Data Sets/Mushroom Data Set/agaricus-lepiota.data", header=None)
-choose_index = np.random.randint(8000,size=1000)
-df = df.iloc[choose_index, :]
-X = df.iloc[:,1:].to_numpy().T
-y = np.array([df.iloc[:,0].to_numpy()]).reshape(1,-1)
-
 
 class BaseDtrsm(Transformer):
 	def __init__(self, lpn, lnp, lbp, lbn):
@@ -18,10 +9,10 @@ class BaseDtrsm(Transformer):
 		self._y = None
 		self._C = 0
 		self._D = 0
-		self.LPN = lpn # 6
-		self.LNP = lnp # 3
-		self.LBP = lbp # 1
-		self.LBN = lbn # 3
+		self.LPN = lpn
+		self.LNP = lnp
+		self.LBP = lbp
+		self.LBN = lbn 
 		self.alpha = (self.LPN - self.LBN) / (self.LPN - self.LBN + self.LBP)
 		self.beta = self.LBN / (self.LBN + self.LNP - self.LBP)
 		self.preserved_attrs = None
@@ -39,12 +30,16 @@ class BaseDtrsm(Transformer):
 		R = np.arange(R.size)[R == '1']
 		if R.size == 0:
 			return 0
+		# get equivalence class
 		ER = self.partition(R)
 		return ER, R
 	
+	def customized_index(self, R):
+		pass
+	
 	def reduction(self):
 		# reduct attributes based on the measurement above
-		evo = Evolution((20, self._X.shape[0]), 500, self.measurement)
+		evo = Evolution((20, self._X.shape[0]), 500, self.customized_index)
 		best_code = evo.launch()
 		R = np.arange(1, X.shape[0] + 1) * best_code
 		R = R[R > 0] - 1
@@ -60,6 +55,20 @@ class BaseDtrsm(Transformer):
 	
 
 class MinCostReduct(BaseDtrsm):
+	'''
+	以决策损失最小化来约简属性
+	参数：
+	[lpn] 将假例判断成真例的损失
+	[lnp] 将真例判断成假例的损失
+	[lbp] 将真例判断为等待进一步观察的损失
+	[lbn] 将假例判断成等待进一步观察的损失
+	调用方法：
+	>>> mcr = MinCostReduct(6, 3, 1, 3)
+	>>> # X 以列向量输入，m个nx维样本的样本集 X 输入为 X.shape 为 (nx,m)，y.shape 为 (ny,m)
+	>>> X = mcr.fit_transform(X, y)
+	>>> # 可通过重写 MinCostReduct 类的 customized_index 方法来自定义 fitness 度量
+	'''
+	
 	def __init__(self, lpn, lnp, lbp, lbn):
 		super().__init__(lpn, lnp, lbp, lbn)
 	
@@ -78,11 +87,28 @@ class MinCostReduct(BaseDtrsm):
 			else:
 				loss += weighest * self.LNP * len(eqcls)
 		# 根据约简集的长度和损失来计算 fitness
-		return 1 / (loss + (R.size / self._X.shape[0]) ** 0.3)
+		return loss
 	
-
+	def customized_index(self, R):
+		loss = self.measurement(R)
+		return 1 / (loss + (len(R.strip("0")) / self._X.shape[0]) ** 0.3)
+	
 		
 class RegionPreservedReduct(BaseDtrsm):
+	'''
+	保持决策类的非负域不变以约简属性
+	参数：
+	[lpn] 将假例判断成真例的损失
+	[lnp] 将真例判断成假例的损失
+	[lbp] 将真例判断为等待进一步观察的损失
+	[lbn] 将假例判断成等待进一步观察的损失
+	调用方法：
+	>>> rpr = RegionPreservedReduct(6, 3, 1, 3)
+	>>> # X 以列向量输入，m个nx维样本的样本集 X 输入为 X.shape 为 (nx,m)，y.shape 为 (ny,m)
+	>>> X = rpr.fit_transform(X, y)
+	>>> # 可通过重写 RegionPreservedReduct 类的 customized_index 方法来自定义 fitness 度量
+	'''
+
 	def __init__(self, lpn, lnp, lbp, lbn):
 		super().__init__(lpn, lnp, lbp, lbn)
 		
@@ -94,29 +120,41 @@ class RegionPreservedReduct(BaseDtrsm):
 			weighest = max(Counter(y[0, eqcls]).values()) / y[0, eqcls].size
 			if weighest >= self.beta:
 				nneg_size += 1
-		return nneg_size / self._C.size + (self._C.size / R.size) ** 0.3
-		
-
+		return nneg_size
+	
+	def customized_index(self, R):
+		nneg_size = self.measurement(R)
+		return nneg_size / self._C.size + (self._C.size / len(R.strip("0"))) ** 0.3
+	
+	
 class EntropyPreservedReduct(BaseDtrsm):
+	'''
+	保持系统的条件熵不变以约简属性
+	参数：
+	[lpn] 将假例判断成真例的损失
+	[lnp] 将真例判断成假例的损失
+	[lbp] 将真例判断为等待进一步观察的损失
+	[lbn] 将假例判断成等待进一步观察的损失
+	调用方法：
+	>>> epr = EntropyPreservedReduct(6, 3, 1, 3)
+	>>> # X 以列向量输入，m个nx维样本的样本集 X 输入为 X.shape 为 (nx,m)，y.shape 为 (ny,m)
+	>>> X = epr.fit_transform(X, y)
+	>>> # 可通过重写 EntropyPreservedReduct 类的 customized_index 方法来自定义 fitness 度量
+	'''
+	
 	def __init__(self, lpn, lnp, lbp, lbn):
 		super().__init__(lpn, lnp, lbp, lbn)
 	
 	def measurement(self, R):
 		# conditional entropy
 		ER, R = super().measurement(R)
+		conditional_entropy = 0
 		for eq in ER:
-			pXi = eq.size / self._X.shape[1]
-			partition = list(pd.DataFrame(y[:, eq]).T.groupby([0]).groups.values())
-			partition = np.array(partition)
-#			getlen = np.vectorize(lambda x : x.size)
-#			partition = getlen(partition)
-			print(partition)
-			print(len(eq))
-			break
+			pXi_y_distr = pd.Series(self._y[0, eq]).value_counts().to_numpy()
+			pi = pXi_y_distr / pXi_y_distr.sum()
+			conditional_entropy -= eq.size / self._X.shape[1] * (pi * np.log(pi)).sum()
+		return conditional_entropy
 		
-
-
-
-if __name__ == "__main__":
-	epr = EntropyPreservedReduct(6, 3, 1, 3)
-	X = epr.fit_transform(X, y)
+	def customized_index(self, R):
+		entropy = self.measurement(R)
+		return np.exp(-entropy) + (self._C.size / len(R.strip("0"))) ** 0.3
