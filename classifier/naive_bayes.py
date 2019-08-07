@@ -73,7 +73,7 @@ class DiscreteNB(BaseClassifier):
 		get_max = np.vectorize(get_max)
 		return np.array(get_max(distri_arr))
 
-class GaussianNB_(DiscreteNB):
+class GaussianNB(DiscreteNB):
 	"""
 	【适用于属性值连续的贝叶斯分类器】
 	"""
