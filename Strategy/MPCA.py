@@ -29,7 +29,7 @@ class MPCA:
 	
 	def predict(self, X):
 		X_train, y_train, X_test = self._X, self._y, X
-		y_pred = np.zeros(y_test.size)
+		y_pred = np.zeros(X_test.shape[0])
 		TEST = np.arange(X_test.shape[0])
 		
 		while True:
@@ -41,8 +41,8 @@ class MPCA:
 			# 求LPN[i]， 表示将不是第 i 类的样本判为第 i 类的损失
 			LPN = np.array([(self.L[ci,:] * proba_distr).mean(axis=0).sum() for ci in self._C])
 			LNP = np.array([(self.L[:,ci] * proba_distr).mean(axis=0).sum() for ci in self._C])
-			LBP = thetaBP * LNP
-			LBN = thetaBN * LPN
+			LBP = self.thetaBP * LNP
+			LBN = self.thetaBN * LPN
 			# alpha[i] 表示第 i 类的阈值
 			alpha = (LPN - LBN) / (LPN - LBN + LBP)
 			beta = LBN / (LBN + LNP - LBP)

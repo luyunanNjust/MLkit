@@ -5,6 +5,7 @@ from BaseClassifier import BaseClassifier
 class DiscreteNB(BaseClassifier):
 	"""
 	【适用于属性为离散值的贝叶斯分类器】
+	确保决策类的标记值为 0 1 2 3...
 	"""
 	def __init__(self):
 		super().__init__()
@@ -53,7 +54,7 @@ class DiscreteNB(BaseClassifier):
 		def trans(distr):
 			C = [0] * len(self._C)
 			for it in distr.items():
-				C[it[0] - self._C[0]] = it[1]
+				C[it[0]] = it[1]
 			res.append(C)
 			return 0
 		
@@ -76,6 +77,7 @@ class DiscreteNB(BaseClassifier):
 class GaussianNB(DiscreteNB):
 	"""
 	【适用于属性值连续的贝叶斯分类器】
+	确保决策类的标记值为 0 1 2 3...
 	"""
 	def __init__(self):
 		super().__init__()
@@ -103,5 +105,5 @@ class GaussianNB(DiscreteNB):
 		# 计算公式 P(ci|x) = IIP(xd|ci) * P(ci) / P(x)
 		for ci in self._C:
 			p_fea = self.__gauss_distr(self.gauss_func_dict[ci][0], self.gauss_func_dict[ci][1], x)
-			C_distribution[ci] = reduce(lambda x,y:x*y, p_fea) * self.class_prior_[ci - self._C[0]]
+			C_distribution[ci] = reduce(lambda x,y:x*y, p_fea) * self.class_prior_[ci]
 		return C_distribution
